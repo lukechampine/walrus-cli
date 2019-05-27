@@ -20,6 +20,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"lukechampine.com/flagg"
+	"lukechampine.com/walrus"
 )
 
 var (
@@ -178,7 +179,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		c := makeClient(*apiAddr)
+		c := walrus.NewWatchSeedClient(*apiAddr)
 		bal, err := c.Balance()
 		check(err, "Could not get balance")
 		fmt.Println(currencyUnits(bal))
@@ -188,7 +189,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		c := makeClient(*apiAddr)
+		c := walrus.NewWatchSeedClient(*apiAddr)
 		addrs, err := c.AllAddresses()
 		check(err, "Could not get address list")
 		for _, addr := range addrs {
@@ -200,7 +201,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		c := makeClient(*apiAddr)
+		c := walrus.NewWatchSeedClient(*apiAddr)
 		addrs, err := c.AllAddresses()
 		check(err, "Could not get address list")
 		var index uint64
@@ -236,7 +237,7 @@ func main() {
 		fmt.Println("    " + addr.String())
 		fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 		bufio.NewReader(os.Stdin).ReadLine()
-		addrInfo := seedAddressInfo{
+		addrInfo := wallet.SeedAddressInfo{
 			UnlockConditions: types.UnlockConditions{
 				PublicKeys:         []types.SiaPublicKey{pubkey},
 				SignaturesRequired: 1,
@@ -269,7 +270,7 @@ func main() {
 			outputsSum = outputsSum.Add(outputs[i].Value)
 		}
 		numOutputs := len(outputs)
-		c := makeClient(*apiAddr)
+		c := walrus.NewWatchSeedClient(*apiAddr)
 		utxos, err := c.UnspentOutputs()
 		check(err, "Could not get utxos")
 		inputs := make([]wallet.ValuedInput, len(utxos))
@@ -318,7 +319,7 @@ func main() {
 				fmt.Println("    " + changeAddr.String())
 				fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 				bufio.NewReader(os.Stdin).ReadLine()
-				addrInfo := seedAddressInfo{
+				addrInfo := wallet.SeedAddressInfo{
 					UnlockConditions: types.UnlockConditions{
 						PublicKeys:         []types.SiaPublicKey{pubkey},
 						SignaturesRequired: 1,
@@ -385,7 +386,7 @@ func main() {
 			return
 		}
 		txn := readTxn(args[0])
-		c := makeClient(*apiAddr)
+		c := walrus.NewWatchSeedClient(*apiAddr)
 		nanos, err := OpenNanoS()
 		check(err, "Could not connect to Nano S")
 
@@ -408,12 +409,12 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		err := broadcastFlow(makeClient(*apiAddr), readTxn(args[0]))
+		err := broadcastFlow(walrus.NewWatchSeedClient(*apiAddr), readTxn(args[0]))
 		check(err, "Could not broadcast transaction")
 	}
 }
 
-func broadcastFlow(c *walrusClient, txn types.Transaction) error {
+func broadcastFlow(c *walrus.WatchSeedClient, txn types.Transaction) error {
 	err := c.Broadcast([]types.Transaction{txn})
 	if err != nil {
 		return err
@@ -423,7 +424,7 @@ func broadcastFlow(c *walrusClient, txn types.Transaction) error {
 	return nil
 }
 
-func signFlow(c *walrusClient, nanos *NanoS, txn *types.Transaction) error {
+func signFlow(c *walrus.WatchSeedClient, nanos *NanoS, txn *types.Transaction) error {
 	addrs, err := c.AllAddresses()
 	check(err, "Could not get addresses")
 	addrMap := make(map[types.UnlockHash]struct{})
