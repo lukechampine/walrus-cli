@@ -1,6 +1,6 @@
 # walrus-cli
 
-`walrus-cli` is a client for [`walrus`](https://github.com/lukechampine/us/tree/master/cmd/walrus).
+`walrus-cli` is a client for [`walrus`](https://github.com/lukechampine/walrus).
 It is currently geared towards watch-only wallets used in tandem with a Ledger
 Nano S hardware wallet. Support for "hot" seed-based wallets may be added in the
 future.
