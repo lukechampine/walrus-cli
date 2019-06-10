@@ -180,7 +180,7 @@ func main() {
 			return
 		}
 		c := walrus.NewWatchSeedClient(*apiAddr)
-		bal, err := c.Balance()
+		bal, err := c.Balance(true)
 		check(err, "Could not get balance")
 		fmt.Println(currencyUnits(bal))
 
@@ -190,7 +190,7 @@ func main() {
 			return
 		}
 		c := walrus.NewWatchSeedClient(*apiAddr)
-		addrs, err := c.AllAddresses()
+		addrs, err := c.Addresses()
 		check(err, "Could not get address list")
 		for _, addr := range addrs {
 			fmt.Println(addr)
@@ -202,7 +202,7 @@ func main() {
 			return
 		}
 		c := walrus.NewWatchSeedClient(*apiAddr)
-		addrs, err := c.AllAddresses()
+		addrs, err := c.Addresses()
 		check(err, "Could not get address list")
 		var index uint64
 		if len(args) == 0 {
@@ -271,7 +271,7 @@ func main() {
 		}
 		numOutputs := len(outputs)
 		c := walrus.NewWatchSeedClient(*apiAddr)
-		utxos, err := c.UnspentOutputs()
+		utxos, err := c.UnspentOutputs(false)
 		check(err, "Could not get utxos")
 		inputs := make([]wallet.ValuedInput, len(utxos))
 		for i := range utxos {
@@ -299,7 +299,7 @@ func main() {
 				fmt.Println("This transaction requires a 'change output' that will send excess coins back to your wallet.")
 				fmt.Println("Please verify and accept the prompt on your device to generate a change address.")
 				fmt.Println("(You may use the --change flag to specify a change address in advance.)")
-				addrs, err := c.AllAddresses()
+				addrs, err := c.Addresses()
 				check(err, "Could not get address list")
 				var index uint64
 				for _, addr := range addrs {
@@ -425,7 +425,7 @@ func broadcastFlow(c *walrus.WatchSeedClient, txn types.Transaction) error {
 }
 
 func signFlow(c *walrus.WatchSeedClient, nanos *NanoS, txn *types.Transaction) error {
-	addrs, err := c.AllAddresses()
+	addrs, err := c.Addresses()
 	check(err, "Could not get addresses")
 	addrMap := make(map[types.UnlockHash]struct{})
 	for _, addr := range addrs {
