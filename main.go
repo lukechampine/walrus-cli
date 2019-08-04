@@ -14,12 +14,12 @@ import (
 	"strconv"
 	"strings"
 
-	"lukechampine.com/us/wallet"
-
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"lukechampine.com/flagg"
+	"lukechampine.com/sialedger"
+	"lukechampine.com/us/wallet"
 	"lukechampine.com/walrus"
 )
 
@@ -78,8 +78,6 @@ Signs the inputs of the provided transaction that the wallet controls.
 Broadcasts the provided transaction.
 `
 )
-
-var usage = flagg.SimpleUsage(flagg.Root, rootUsage)
 
 func check(err error, ctx string) {
 	if err != nil {
@@ -228,10 +226,10 @@ func main() {
 				}
 			}
 		}
-		nanos, err := OpenNanoS()
+		nanos, err := sialedger.OpenNanoS()
 		check(err, "Could not connect to Nano S")
 		fmt.Printf("Please verify and accept the prompt on your device to generate address #%v.\n", index)
-		addr, pubkey, err := nanos.GetAddress(uint32(index))
+		addr, pubkey, err := nanos.GetAddress(uint32(index), false)
 		check(err, "Could not generate address")
 		fmt.Println("Compare the address displayed on your device to the address below:")
 		fmt.Println("    " + addr.String())
@@ -289,7 +287,7 @@ func main() {
 		if !ok {
 			check(errors.New("insufficient funds"), "Could not create transaction")
 		}
-		var nanos *NanoS
+		var nanos *sialedger.NanoS
 		if !change.IsZero() {
 			var changeAddr types.UnlockHash
 			if *changeAddrStr != "" {
@@ -310,10 +308,10 @@ func main() {
 					}
 				}
 				index++
-				nanos, err = OpenNanoS()
+				nanos, err = sialedger.OpenNanoS()
 				check(err, "Could not connect to Nano S")
 				var pubkey types.SiaPublicKey
-				changeAddr, pubkey, err = nanos.GetAddress(uint32(index))
+				changeAddr, pubkey, err = nanos.GetAddress(uint32(index), false)
 				check(err, "Could not generate address")
 				fmt.Println("Compare the address displayed on your device to the address below:")
 				fmt.Println("    " + changeAddr.String())
@@ -358,7 +356,7 @@ func main() {
 
 		if sign {
 			if nanos == nil {
-				nanos, err = OpenNanoS()
+				nanos, err = sialedger.OpenNanoS()
 				check(err, "Could not connect to Nano S")
 			}
 			err := signFlow(c, nanos, &txn)
@@ -387,7 +385,7 @@ func main() {
 		}
 		txn := readTxn(args[0])
 		c := walrus.NewWatchSeedClient(*apiAddr)
-		nanos, err := OpenNanoS()
+		nanos, err := sialedger.OpenNanoS()
 		check(err, "Could not connect to Nano S")
 
 		err = signFlow(c, nanos, &txn)
@@ -424,7 +422,7 @@ func broadcastFlow(c *walrus.WatchSeedClient, txn types.Transaction) error {
 	return nil
 }
 
-func signFlow(c *walrus.WatchSeedClient, nanos *NanoS, txn *types.Transaction) error {
+func signFlow(c *walrus.WatchSeedClient, nanos *sialedger.NanoS, txn *types.Transaction) error {
 	addrs, err := c.Addresses()
 	check(err, "Could not get addresses")
 	addrMap := make(map[types.UnlockHash]struct{})
