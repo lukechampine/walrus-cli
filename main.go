@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -126,6 +128,31 @@ func writeTxn(filename string, txn types.Transaction) {
 	js = append(js, '\n')
 	err := ioutil.WriteFile(filename, js, 0666)
 	check(err, "Could not write transaction to disk")
+}
+
+func getDonationAddr(narwalAddr string) (types.UnlockHash, bool) {
+	u, err := url.Parse(narwalAddr)
+	if err != nil {
+		return types.UnlockHash{}, false
+	}
+	if u.Scheme == "" {
+		u.Scheme = "http"
+	}
+	path := strings.Split(u.Path, "/")
+	if len(path) < 2 || path[len(path)-2] != "wallet" {
+		return types.UnlockHash{}, false
+	}
+	path = append(path[:len(path)-2], "donations")
+	u.Path = strings.Join(path, "/")
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return types.UnlockHash{}, false
+	}
+	defer resp.Body.Close()
+	defer ioutil.ReadAll(resp.Body)
+	var addr types.UnlockHash
+	err = json.NewDecoder(resp.Body).Decode(&addr)
+	return addr, err == nil
 }
 
 func main() {
@@ -271,6 +298,22 @@ func main() {
 			outputsSum = outputsSum.Add(outputs[i].Value)
 		}
 		numOutputs := len(outputs)
+
+		// if using a narwal server, add donation
+		var donation types.Currency
+		donationAddr, haveDonation := getDonationAddr(*apiAddr)
+		if haveDonation {
+			// donation is max(1%, 10SC)
+			donation = outputsSum.MulRat(big.NewRat(1, 100))
+			if tenSC := types.SiacoinPrecision.Mul64(10); donation.Cmp(tenSC) < 0 {
+				donation = tenSC
+			}
+			outputs = append(outputs, types.SiacoinOutput{
+				UnlockHash: donationAddr,
+				Value:      donation,
+			})
+		}
+
 		c := walrus.NewWatchSeedClient(*apiAddr)
 		utxos, err := c.UnspentOutputs(false)
 		check(err, "Could not get utxos")
@@ -350,9 +393,12 @@ func main() {
 		check(err, "Could not write transaction to disk")
 		fmt.Println("Transaction summary:")
 		fmt.Printf("- %v input%v, totalling %v\n", len(used), plural(len(used)), currencyUnits(inputSum))
-		fmt.Printf("- %v output%v, totalling %v\n", numOutputs, plural(numOutputs), currencyUnits(outputsSum))
+		fmt.Printf("- %v output%v, totalling %v\n", numOutputs, plural(numOutputs), currencyUnits(outputsSum.Sub(donation)))
 		if !change.IsZero() {
 			fmt.Printf(" (plus a change output, sending %v back to your wallet)\n", currencyUnits(change))
+		}
+		if haveDonation {
+			fmt.Printf(" (plus a donation of %v to the narwal server\n", currencyUnits(donation))
 		}
 		fmt.Printf("- A miner fee of %v, which is %v/byte\n", currencyUnits(fee), currencyUnits(feePerByte))
 		fmt.Println()
