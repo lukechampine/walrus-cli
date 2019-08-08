@@ -262,9 +262,12 @@ func main() {
 			}
 			err := outputs[i].UnlockHash.LoadString(strings.TrimSpace(addrAmount[0]))
 			check(err, "Invalid destination address")
-			amount, err := strconv.ParseFloat(strings.TrimSpace(addrAmount[1]), 64)
-			check(err, "Invalid destination amount")
-			outputs[i].Value = types.SiacoinPrecision.MulFloat(amount)
+			amount, ok := new(big.Rat).SetString(strings.TrimSpace(addrAmount[1]))
+			if !ok {
+				_, err := strconv.ParseFloat(strings.TrimSpace(addrAmount[1]), 64)
+				check(err, "Invalid destination amount")
+			}
+			outputs[i].Value = types.SiacoinPrecision.MulRat(amount)
 			outputsSum = outputsSum.Add(outputs[i].Value)
 		}
 		numOutputs := len(outputs)
