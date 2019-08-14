@@ -377,7 +377,7 @@ func main() {
 		}
 		feePerByte, err := c.RecommendedFee()
 		check(err, "Could not get recommended transaction fee")
-		used, fee, change, ok := wallet.FundTransaction(outputsSum, feePerByte, inputs)
+		used, fee, change, ok := wallet.FundTransaction(outputsSum.Add(donation), feePerByte, inputs)
 		if !ok {
 			check(errors.New("insufficient funds"), "Could not create transaction")
 		}
