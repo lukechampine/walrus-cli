@@ -270,8 +270,12 @@ func main() {
 		c := walrus.NewWatchSeedClient(*apiAddr)
 		addrs, err := c.Addresses()
 		check(err, "Could not get address list")
-		for _, addr := range addrs {
-			fmt.Println(addr)
+		if len(addrs) == 0 {
+			fmt.Println("No addresses.")
+		} else {
+			for _, addr := range addrs {
+				fmt.Println(addr)
+			}
 		}
 
 	case addrCmd:
