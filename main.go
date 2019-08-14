@@ -50,6 +50,11 @@ Actions:
 
 Reports the current balance.
 `
+	seedUsage = `Usage:
+walrus-cli seed
+
+Generates a random seed.
+`
 	addressesUsage = `Usage:
     walrus-cli addresses
 
@@ -202,6 +207,7 @@ func main() {
 	hot := rootCmd.Bool("hot", false, "use a 'hot' seed-based wallet")
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
 	versionCmd := flagg.New("version", versionUsage)
+	seedCmd := flagg.New("seed", seedUsage)
 	balanceCmd := flagg.New("balance", balanceUsage)
 	addressesCmd := flagg.New("addresses", addressesUsage)
 	addrCmd := flagg.New("addr", addrUsage)
@@ -217,6 +223,7 @@ func main() {
 		Cmd: rootCmd,
 		Sub: []flagg.Tree{
 			{Cmd: versionCmd},
+			{Cmd: seedCmd},
 			{Cmd: balanceCmd},
 			{Cmd: addressesCmd},
 			{Cmd: addrCmd},
@@ -237,6 +244,13 @@ func main() {
 	case versionCmd:
 		log.Printf("walrus-cli v0.1.0\nCommit:     %s\nRelease:    %s\nGo version: %s %s/%s\nBuild Date: %s\n",
 			githash, build.Release, runtime.Version(), runtime.GOOS, runtime.GOARCH, builddate)
+
+	case seedCmd:
+		if len(args) != 0 {
+			cmd.Usage()
+			return
+		}
+		fmt.Println(wallet.NewSeed())
 
 	case balanceCmd:
 		if len(args) != 0 {
