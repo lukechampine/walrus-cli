@@ -51,7 +51,7 @@ Actions:
 Reports the current balance.
 `
 	seedUsage = `Usage:
-walrus-cli seed
+    walrus-cli seed
 
 Generates a random seed.
 `
