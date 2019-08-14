@@ -425,6 +425,7 @@ func main() {
 				check(err, "Could not add address to wallet")
 				fmt.Println("Change address added successfully.")
 				fmt.Println()
+				changeAddr = wallet.StandardAddress(pubkey)
 			}
 			outputs = append(outputs, types.SiacoinOutput{
 				Value:      change,
@@ -445,11 +446,11 @@ func main() {
 		fmt.Println("Transaction summary:")
 		fmt.Printf("- %v input%v, totalling %v\n", len(used), plural(len(used)), currencyUnits(inputSum))
 		fmt.Printf("- %v output%v, totalling %v\n", numOutputs, plural(numOutputs), currencyUnits(outputsSum.Sub(donation)))
-		if !change.IsZero() {
-			fmt.Printf(" (plus a change output, sending %v back to your wallet)\n", currencyUnits(change))
-		}
 		if haveDonation {
 			fmt.Printf(" (plus a donation of %v to the narwal server\n", currencyUnits(donation))
+		}
+		if !change.IsZero() {
+			fmt.Printf(" (plus a change output, sending %v back to your wallet)\n", currencyUnits(change))
 		}
 		fmt.Printf("- A miner fee of %v, which is %v/byte\n", currencyUnits(fee), currencyUnits(feePerByte))
 		fmt.Println()
