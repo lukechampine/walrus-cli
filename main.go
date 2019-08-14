@@ -618,6 +618,8 @@ func signFlowHot(c *walrus.WatchSeedClient, seed wallet.Seed, txn *types.Transac
 		r := new(big.Rat).SetFrac(fee.Big(), types.SiacoinPrecision.Big())
 		fmt.Println("    A miner fee of", r.FloatString(5), "SC")
 	}
+	fmt.Print("Press ENTER to sign this transaction, or Ctrl-C to cancel.")
+	bufio.NewReader(os.Stdin).ReadLine()
 
 	// sign each TransactionSignature
 	for sigIndex, keyIndex := range sigMap {
