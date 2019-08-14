@@ -19,6 +19,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/types"
+	"golang.org/x/crypto/ssh/terminal"
 	"lukechampine.com/flagg"
 	"lukechampine.com/sialedger"
 	"lukechampine.com/us/wallet"
@@ -155,12 +156,50 @@ func getDonationAddr(narwalAddr string) (types.UnlockHash, bool) {
 	return addr, err == nil
 }
 
+func getSeed() wallet.Seed {
+	phrase := os.Getenv("WALRUS_SEED")
+	if phrase != "" {
+		fmt.Println("Using WALRUS_SEED environment variable")
+	} else {
+		fmt.Print("Seed: ")
+		pw, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			log.Fatal("Could not read seed phrase:", err)
+		}
+		fmt.Println()
+		phrase = string(pw)
+	}
+	seed, err := wallet.SeedFromPhrase(phrase)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return seed
+}
+
+func nextUnusedIndex(c *walrus.WatchSeedClient) uint64 {
+	addrs, err := c.Addresses()
+	check(err, "Could not get address list")
+	var index uint64
+	for _, addr := range addrs {
+		addrInfo, err := c.AddressInfo(addr)
+		check(err, "Could not get address info")
+		if addrInfo.KeyIndex > index {
+			index = addrInfo.KeyIndex
+		}
+	}
+	if len(addrs) > 0 {
+		index++
+	}
+	return index
+}
+
 func main() {
 	log.SetFlags(0)
 	var sign, broadcast bool // used by txn and sign commands
 
 	rootCmd := flagg.Root
 	apiAddr := rootCmd.String("a", "localhost:9380", "host:port that the walrus API is running on")
+	hot := rootCmd.Bool("hot", false, "use a 'hot' seed-based wallet")
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
 	versionCmd := flagg.New("version", versionUsage)
 	balanceCmd := flagg.New("balance", balanceUsage)
@@ -239,7 +278,9 @@ func main() {
 					index = addrInfo.KeyIndex
 				}
 			}
-			index++
+			if len(addrs) > 0 {
+				index++
+			}
 			fmt.Printf("No index specified; using lowest available index (%v)\n", index)
 		} else {
 			index, err = strconv.ParseUint(args[0], 10, 32)
@@ -253,23 +294,30 @@ func main() {
 				}
 			}
 		}
-		nanos, err := sialedger.OpenNanoS()
-		check(err, "Could not connect to Nano S")
-		fmt.Printf("Please verify and accept the prompt on your device to generate address #%v.\n", index)
-		addr, pubkey, err := nanos.GetAddress(uint32(index), false)
-		check(err, "Could not generate address")
-		fmt.Println("Compare the address displayed on your device to the address below:")
-		fmt.Println("    " + addr.String())
+		var pubkey types.SiaPublicKey
+		if *hot {
+			seed := getSeed()
+			pubkey = seed.PublicKey(index)
+			fmt.Println("Derived address from seed:")
+			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+		} else {
+			nanos, err := sialedger.OpenNanoS()
+			check(err, "Could not connect to Nano S")
+			fmt.Printf("Please verify and accept the prompt on your device to generate address #%v.\n", index)
+			_, pubkey, err = nanos.GetAddress(uint32(index), false)
+			check(err, "Could not generate address")
+			fmt.Println("Compare the address displayed on your device to the address below:")
+			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+		}
 		fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 		bufio.NewReader(os.Stdin).ReadLine()
-		addrInfo := wallet.SeedAddressInfo{
+		err = c.WatchAddress(wallet.SeedAddressInfo{
 			UnlockConditions: types.UnlockConditions{
 				PublicKeys:         []types.SiaPublicKey{pubkey},
 				SignaturesRequired: 1,
 			},
 			KeyIndex: index,
-		}
-		err = c.WatchAddress(addrInfo)
+		})
 		check(err, "Could not add address to wallet")
 		fmt.Println("Address added successfully.")
 
@@ -333,44 +381,47 @@ func main() {
 		if !ok {
 			check(errors.New("insufficient funds"), "Could not create transaction")
 		}
+
+		// we may need these once, twice, or not at all, depending on whether
+		// we're signing and whether we need a change output; regardless, we
+		// only want to fetch them once.
 		var nanos *sialedger.NanoS
+		var seed wallet.Seed
+
+		// get change address
 		if !change.IsZero() {
 			var changeAddr types.UnlockHash
 			if *changeAddrStr != "" {
 				err = changeAddr.LoadString(*changeAddrStr)
 				check(err, "Could not parse change address")
 			} else {
-				fmt.Println("This transaction requires a 'change output' that will send excess coins back to your wallet.")
-				fmt.Println("Please verify and accept the prompt on your device to generate a change address.")
-				fmt.Println("(You may use the --change flag to specify a change address in advance.)")
-				addrs, err := c.Addresses()
-				check(err, "Could not get address list")
-				var index uint64
-				for _, addr := range addrs {
-					addrInfo, err := c.AddressInfo(addr)
-					check(err, "Could not get address info")
-					if addrInfo.KeyIndex > index {
-						index = addrInfo.KeyIndex
-					}
-				}
-				index++
-				nanos, err = sialedger.OpenNanoS()
-				check(err, "Could not connect to Nano S")
 				var pubkey types.SiaPublicKey
-				changeAddr, pubkey, err = nanos.GetAddress(uint32(index), false)
-				check(err, "Could not generate address")
-				fmt.Println("Compare the address displayed on your device to the address below:")
-				fmt.Println("    " + changeAddr.String())
+				fmt.Println("This transaction requires a 'change output' that will send excess coins back to your wallet.")
+				index := nextUnusedIndex(c)
+				if *hot {
+					seed = getSeed()
+					pubkey = seed.PublicKey(index)
+					fmt.Println("Derived address from seed:")
+					fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+				} else {
+					fmt.Println("Please verify and accept the prompt on your device to generate a change address.")
+					fmt.Println("(You may use the --change flag to specify a change address in advance.)")
+					nanos, err = sialedger.OpenNanoS()
+					check(err, "Could not connect to Nano S")
+					_, pubkey, err = nanos.GetAddress(uint32(index), false)
+					check(err, "Could not generate address")
+					fmt.Println("Compare the address displayed on your device to the address below:")
+					fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+				}
 				fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 				bufio.NewReader(os.Stdin).ReadLine()
-				addrInfo := wallet.SeedAddressInfo{
+				err = c.WatchAddress(wallet.SeedAddressInfo{
 					UnlockConditions: types.UnlockConditions{
 						PublicKeys:         []types.SiaPublicKey{pubkey},
 						SignaturesRequired: 1,
 					},
 					KeyIndex: index,
-				}
-				err = c.WatchAddress(addrInfo)
+				})
 				check(err, "Could not add address to wallet")
 				fmt.Println("Change address added successfully.")
 				fmt.Println()
@@ -404,12 +455,20 @@ func main() {
 		fmt.Println()
 
 		if sign {
-			if nanos == nil {
-				nanos, err = sialedger.OpenNanoS()
-				check(err, "Could not connect to Nano S")
+			if *hot {
+				if seed == (wallet.Seed{}) {
+					seed = getSeed()
+				}
+				err := signFlowHot(c, seed, &txn)
+				check(err, "Could not sign transaction")
+			} else {
+				if nanos == nil {
+					nanos, err = sialedger.OpenNanoS()
+					check(err, "Could not connect to Nano S")
+				}
+				err := signFlow(c, nanos, &txn)
+				check(err, "Could not sign transaction")
 			}
-			err := signFlow(c, nanos, &txn)
-			check(err, "Could not sign transaction")
 		} else {
 			fmt.Println("Transaction has not been signed. You can sign it with the 'sign' command.")
 		}
@@ -434,11 +493,16 @@ func main() {
 		}
 		txn := readTxn(args[0])
 		c := walrus.NewWatchSeedClient(*apiAddr)
-		nanos, err := sialedger.OpenNanoS()
-		check(err, "Could not connect to Nano S")
-
-		err = signFlow(c, nanos, &txn)
-		check(err, "Could not sign transaction")
+		if *hot {
+			seed := getSeed()
+			err := signFlowHot(c, seed, &txn)
+			check(err, "Could not sign transaction")
+		} else {
+			nanos, err := sialedger.OpenNanoS()
+			check(err, "Could not connect to Nano S")
+			err = signFlow(c, nanos, &txn)
+			check(err, "Could not sign transaction")
+		}
 
 		if broadcast {
 			err := broadcastFlow(c, txn)
@@ -515,6 +579,49 @@ func signFlow(c *walrus.WatchSeedClient, nanos *sialedger.NanoS, txn *types.Tran
 		check(err, "Could not get signature")
 		txn.TransactionSignatures[sigIndex].Signature = sig[:]
 		fmt.Println("Done")
+	}
+	return nil
+}
+
+func signFlowHot(c *walrus.WatchSeedClient, seed wallet.Seed, txn *types.Transaction) error {
+	addrs, err := c.Addresses()
+	check(err, "Could not get addresses")
+	addrMap := make(map[types.UnlockHash]struct{})
+	for _, addr := range addrs {
+		addrMap[addr] = struct{}{}
+	}
+	sigMap := make(map[int]uint64)
+	for _, in := range txn.SiacoinInputs {
+		addr := in.UnlockConditions.UnlockHash()
+		if _, ok := addrMap[addr]; ok {
+			// get key index
+			info, err := c.AddressInfo(addr)
+			check(err, "Could not get address info")
+			// add signature entry
+			sig := wallet.StandardTransactionSignature(crypto.Hash(in.ParentID))
+			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
+			sigMap[len(txn.TransactionSignatures)-1] = info.KeyIndex
+			continue
+		}
+	}
+	if len(sigMap) == 0 {
+		fmt.Println("Nothing to sign: transaction does not spend any outputs recognized by this wallet")
+		return nil
+	}
+	fmt.Println("Please verify the transaction details:")
+	for _, sco := range txn.SiacoinOutputs {
+		r := new(big.Rat).SetFrac(sco.Value.Big(), types.SiacoinPrecision.Big())
+		fmt.Println("   ", sco.UnlockHash, "receiving", r.FloatString(5), "SC")
+	}
+	for _, fee := range txn.MinerFees {
+		r := new(big.Rat).SetFrac(fee.Big(), types.SiacoinPrecision.Big())
+		fmt.Println("    A miner fee of", r.FloatString(5), "SC")
+	}
+
+	// sign each TransactionSignature
+	for sigIndex, keyIndex := range sigMap {
+		sig := seed.SecretKey(keyIndex).SignHash(txn.SigHash(sigIndex, types.ASICHardforkHeight+1))
+		txn.TransactionSignatures[sigIndex].Signature = sig
 	}
 	return nil
 }

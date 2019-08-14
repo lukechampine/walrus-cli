@@ -1,16 +1,20 @@
 # walrus-cli
 
 `walrus-cli` is a client for [`walrus`](https://github.com/lukechampine/walrus).
-It is currently geared towards watch-only wallets used in tandem with a Ledger
-Nano S hardware wallet. Support for "hot" seed-based wallets may be added in the
-future.
+It makes it easy to check your balance, generate addresses, and sign and
+broadcast transactions using either a "cold" Ledger Nano S hardware wallet or a
+traditional "hot" wallet.
 
 ## Setup
 
-You will need a synchronized `walrus` server running in watch-only mode. You
-will also need a Ledger Nano S hardware wallet with the
-[Sia app](https://github.com/LedgerHQ/nanos-app-sia) installed. The app must
-be open on the device when `walrus-cli` commands are run.
+You will need a synchronized `walrus` server running in watch-only mode.
+
+If you are using a Nano S, the [Sia app](https://github.com/LedgerHQ/nanos-app-sia) must be installed and open when
+`walrus-cli` commands are run.
+
+If you are using `walrus-cli` as a hot wallet, pass the `-hot` flag to all
+commands. Each command will prompt you to enter your seed. You can bypass these
+prompts by setting the `WALRUS_SEED` environment variable.
 
 
 ## Generating an Address
@@ -33,8 +37,10 @@ $ walrus-cli txn $DEST_ADDR_1:100,$DEST_ADDR_2:0.1 txn.json
 ```
 
 `walrus-cli` will figure out which UTXOs to use, select an appropriate fee, and
-send any change back to an address you control. The resulting transaction will
-be written to disk as JSON.
+send any change back to an address you control. If you are using `walrus-cli`
+with a `narwal` server, a donation will also be added: either 1% of the
+transaction value, or 10 SC, whichever is greater. The resulting transaction
+will be written to disk as JSON.
 
 
 ## Signing a Transaction
