@@ -463,7 +463,7 @@ func main() {
 		check(err, "Could not write transaction to disk")
 		fmt.Println("Transaction summary:")
 		fmt.Printf("- %v input%v, totalling %v\n", len(used), plural(len(used)), currencyUnits(inputSum))
-		fmt.Printf("- %v output%v, totalling %v\n", numOutputs, plural(numOutputs), currencyUnits(outputsSum.Sub(donation)))
+		fmt.Printf("- %v output%v, totalling %v\n", numOutputs, plural(numOutputs), currencyUnits(outputsSum))
 		if haveDonation {
 			fmt.Printf(" (plus a donation of %v to the narwal server\n", currencyUnits(donation))
 		}
