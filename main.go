@@ -349,21 +349,18 @@ func main() {
 			recipSum = recipSum.Add(outputs[i].Value)
 		}
 
-		// if using a narwal server, add donation
+		// if using a narwal server, compute donation
 		var donation types.Currency
-		donationAddr, haveDonation := getDonationAddr(*apiAddr)
-		if haveDonation {
+		donationAddr, ok := getDonationAddr(*apiAddr)
+		if ok {
 			// donation is max(1%, 10SC)
 			donation = recipSum.MulRat(big.NewRat(1, 100))
 			if tenSC := types.SiacoinPrecision.Mul64(10); donation.Cmp(tenSC) < 0 {
 				donation = tenSC
 			}
-			outputs = append(outputs, types.SiacoinOutput{
-				UnlockHash: donationAddr,
-				Value:      donation,
-			})
 		}
 
+		// fund transaction
 		c := walrus.NewWatchSeedClient(*apiAddr)
 		utxos, err := c.UnspentOutputs(false)
 		check(err, "Could not get utxos")
@@ -381,7 +378,20 @@ func main() {
 		check(err, "Could not get recommended transaction fee")
 		used, fee, change, ok := wallet.FundTransaction(recipSum.Add(donation), feePerByte, inputs)
 		if !ok {
-			check(errors.New("insufficient funds"), "Could not create transaction")
+			// couldn't afford transaction with donation; try funding without
+			// donation and "donate the change" instead
+			used, fee, change, ok = wallet.FundTransaction(recipSum, feePerByte, inputs)
+			if !ok {
+				check(errors.New("insufficient funds"), "Could not create transaction")
+			}
+			donation = change
+			change = types.ZeroCurrency
+		}
+		if !donation.IsZero() {
+			outputs = append(outputs, types.SiacoinOutput{
+				UnlockHash: donationAddr,
+				Value:      donation,
+			})
 		}
 
 		// we may need these once, twice, or not at all, depending on whether
@@ -448,7 +458,7 @@ func main() {
 		fmt.Println("Transaction summary:")
 		fmt.Printf("- %v input%v, totalling %v\n", len(used), plural(len(used)), currencyUnits(inputSum))
 		fmt.Printf("- %v recipient%v, totalling %v\n", len(pairs), plural(len(pairs)), currencyUnits(recipSum))
-		if haveDonation {
+		if !donation.IsZero() {
 			fmt.Printf("- A donation of %v to the narwal server\n", currencyUnits(donation))
 		}
 		fmt.Printf("- A miner fee of %v, which is %v/byte\n", currencyUnits(fee), currencyUnits(feePerByte))
