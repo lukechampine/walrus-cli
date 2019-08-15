@@ -101,23 +101,8 @@ func plural(n int) string {
 }
 
 func currencyUnits(c types.Currency) string {
-	atto := types.NewCurrency64(1000000)
-	if c.Cmp(atto) < 0 {
-		return c.String() + " H"
-	}
-	mag := atto
-	unit := ""
-	for _, unit = range []string{"aS", "fS", "pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"} {
-		if c.Cmp(mag.Mul64(1e3)) < 0 {
-			break
-		} else if unit != "TS" {
-			mag = mag.Mul64(1e3)
-		}
-	}
-	num := new(big.Rat).SetInt(c.Big())
-	denom := new(big.Rat).SetInt(mag.Big())
-	res, _ := new(big.Rat).Mul(num, denom.Inv(denom)).Float64()
-	return fmt.Sprintf("%.4g %s", res, unit)
+	r := new(big.Rat).SetFrac(c.Big(), types.SiacoinPrecision.Big())
+	return strings.TrimRight(r.FloatString(30), "0") + " SC"
 }
 
 func readTxn(filename string) types.Transaction {
@@ -581,12 +566,10 @@ func signFlow(c *walrus.WatchSeedClient, nanos *sialedger.NanoS, txn *types.Tran
 	// request signatures from device
 	fmt.Println("Please verify the transaction details on your device. You should see:")
 	for _, sco := range txn.SiacoinOutputs {
-		r := new(big.Rat).SetFrac(sco.Value.Big(), types.SiacoinPrecision.Big())
-		fmt.Println("   ", sco.UnlockHash, "receiving", r.FloatString(5), "SC")
+		fmt.Println("   ", sco.UnlockHash, "receiving", currencyUnits(sco.Value))
 	}
 	for _, fee := range txn.MinerFees {
-		r := new(big.Rat).SetFrac(fee.Big(), types.SiacoinPrecision.Big())
-		fmt.Println("    A miner fee of", r.FloatString(5), "SC")
+		fmt.Println("    A miner fee of", currencyUnits(fee))
 	}
 	if len(sigMap) > 1 {
 		fmt.Printf("Each signature must be completed separately, so you will be prompted %v times.\n", len(sigMap))
@@ -628,12 +611,10 @@ func signFlowHot(c *walrus.WatchSeedClient, seed wallet.Seed, txn *types.Transac
 	}
 	fmt.Println("Please verify the transaction details:")
 	for _, sco := range txn.SiacoinOutputs {
-		r := new(big.Rat).SetFrac(sco.Value.Big(), types.SiacoinPrecision.Big())
-		fmt.Println("   ", sco.UnlockHash, "receiving", r.FloatString(5), "SC")
+		fmt.Println("   ", sco.UnlockHash, "receiving", currencyUnits(sco.Value))
 	}
 	for _, fee := range txn.MinerFees {
-		r := new(big.Rat).SetFrac(fee.Big(), types.SiacoinPrecision.Big())
-		fmt.Println("    A miner fee of", r.FloatString(5), "SC")
+		fmt.Println("    A miner fee of", currencyUnits(fee))
 	}
 	fmt.Print("Press ENTER to sign this transaction, or Ctrl-C to cancel.")
 	bufio.NewReader(os.Stdin).ReadLine()
