@@ -166,7 +166,7 @@ func getSeed() wallet.Seed {
 	return seed
 }
 
-func nextUnusedIndex(c *walrus.WatchSeedClient) uint64 {
+func nextUnusedIndex(c *walrus.Client) uint64 {
 	addrs, err := c.Addresses()
 	check(err, "Could not get address list")
 	var index uint64
@@ -242,7 +242,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		c := walrus.NewWatchSeedClient(*apiAddr)
+		c := walrus.NewClient(*apiAddr)
 		bal, err := c.Balance(true)
 		check(err, "Could not get balance")
 		fmt.Println(currencyUnits(bal))
@@ -252,7 +252,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		c := walrus.NewWatchSeedClient(*apiAddr)
+		c := walrus.NewClient(*apiAddr)
 		addrs, err := c.Addresses()
 		check(err, "Could not get address list")
 		if len(addrs) == 0 {
@@ -268,7 +268,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		c := walrus.NewWatchSeedClient(*apiAddr)
+		c := walrus.NewClient(*apiAddr)
 		addrs, err := c.Addresses()
 		check(err, "Could not get address list")
 		var index uint64
@@ -314,12 +314,9 @@ func main() {
 		}
 		fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 		bufio.NewReader(os.Stdin).ReadLine()
-		err = c.WatchAddress(wallet.SeedAddressInfo{
-			UnlockConditions: types.UnlockConditions{
-				PublicKeys:         []types.SiaPublicKey{pubkey},
-				SignaturesRequired: 1,
-			},
-			KeyIndex: index,
+		err = c.AddAddress(wallet.SeedAddressInfo{
+			UnlockConditions: wallet.StandardUnlockConditions(pubkey),
+			KeyIndex:         index,
 		})
 		check(err, "Could not add address to wallet")
 		fmt.Println("Address added successfully.")
@@ -361,17 +358,19 @@ func main() {
 		}
 
 		// fund transaction
-		c := walrus.NewWatchSeedClient(*apiAddr)
+		c := walrus.NewClient(*apiAddr)
 		utxos, err := c.UnspentOutputs(false)
 		check(err, "Could not get utxos")
 		inputs := make([]wallet.ValuedInput, len(utxos))
-		for i := range utxos {
+		for i, o := range utxos {
+			info, err := c.AddressInfo(o.UnlockHash)
+			check(err, "Could not get address info")
 			inputs[i] = wallet.ValuedInput{
 				SiacoinInput: types.SiacoinInput{
-					ParentID:         utxos[i].ID,
-					UnlockConditions: utxos[i].UnlockConditions,
+					ParentID:         o.ID,
+					UnlockConditions: info.UnlockConditions,
 				},
-				Value: utxos[i].Value,
+				Value: o.Value,
 			}
 		}
 		feePerByte, err := c.RecommendedFee()
@@ -427,12 +426,9 @@ func main() {
 				}
 				fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 				bufio.NewReader(os.Stdin).ReadLine()
-				err = c.WatchAddress(wallet.SeedAddressInfo{
-					UnlockConditions: types.UnlockConditions{
-						PublicKeys:         []types.SiaPublicKey{pubkey},
-						SignaturesRequired: 1,
-					},
-					KeyIndex: index,
+				err = c.AddAddress(wallet.SeedAddressInfo{
+					UnlockConditions: wallet.StandardUnlockConditions(pubkey),
+					KeyIndex:         index,
 				})
 				check(err, "Could not add address to wallet")
 				fmt.Println("Change address added successfully.")
@@ -505,7 +501,7 @@ func main() {
 			return
 		}
 		txn := readTxn(args[0])
-		c := walrus.NewWatchSeedClient(*apiAddr)
+		c := walrus.NewClient(*apiAddr)
 		if *hot {
 			seed := getSeed()
 			err := signFlowHot(c, seed, &txn)
@@ -533,12 +529,12 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		err := broadcastFlow(walrus.NewWatchSeedClient(*apiAddr), readTxn(args[0]))
+		err := broadcastFlow(walrus.NewClient(*apiAddr), readTxn(args[0]))
 		check(err, "Could not broadcast transaction")
 	}
 }
 
-func broadcastFlow(c *walrus.WatchSeedClient, txn types.Transaction) error {
+func broadcastFlow(c *walrus.Client, txn types.Transaction) error {
 	err := c.Broadcast([]types.Transaction{txn})
 	if err != nil {
 		return err
@@ -548,7 +544,7 @@ func broadcastFlow(c *walrus.WatchSeedClient, txn types.Transaction) error {
 	return nil
 }
 
-func signFlow(c *walrus.WatchSeedClient, nanos *sialedger.NanoS, txn *types.Transaction) error {
+func signFlow(c *walrus.Client, nanos *sialedger.NanoS, txn *types.Transaction) error {
 	addrs, err := c.Addresses()
 	check(err, "Could not get addresses")
 	addrMap := make(map[types.UnlockHash]struct{})
@@ -594,7 +590,7 @@ func signFlow(c *walrus.WatchSeedClient, nanos *sialedger.NanoS, txn *types.Tran
 	return nil
 }
 
-func signFlowHot(c *walrus.WatchSeedClient, seed wallet.Seed, txn *types.Transaction) error {
+func signFlowHot(c *walrus.Client, seed wallet.Seed, txn *types.Transaction) error {
 	addrs, err := c.Addresses()
 	check(err, "Could not get addresses")
 	addrMap := make(map[types.UnlockHash]struct{})
