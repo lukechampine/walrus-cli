@@ -7,7 +7,8 @@ traditional "hot" wallet.
 
 ## Setup
 
-You will need a synchronized `walrus` server running in watch-only mode.
+You will need a synchronized `walrus` server. You can specify the address of the
+server with the `-a` flag.
 
 If you are using a Nano S, the [Sia app](https://github.com/LedgerHQ/nanos-app-sia) must be installed and open when
 `walrus-cli` commands are run.
