@@ -166,23 +166,6 @@ func getSeed() wallet.Seed {
 	return seed
 }
 
-func nextUnusedIndex(c *walrus.Client) uint64 {
-	addrs, err := c.Addresses()
-	check(err, "Could not get address list")
-	var index uint64
-	for _, addr := range addrs {
-		addrInfo, err := c.AddressInfo(addr)
-		check(err, "Could not get address info")
-		if addrInfo.KeyIndex > index {
-			index = addrInfo.KeyIndex
-		}
-	}
-	if len(addrs) > 0 {
-		index++
-	}
-	return index
-}
-
 func main() {
 	log.SetFlags(0)
 	var sign, broadcast bool // used by txn and sign commands
@@ -273,18 +256,9 @@ func main() {
 		check(err, "Could not get address list")
 		var index uint64
 		if len(args) == 0 {
-			// use smallest unused index
-			for _, addr := range addrs {
-				addrInfo, err := c.AddressInfo(addr)
-				check(err, "Could not get address info")
-				if addrInfo.KeyIndex > index {
-					index = addrInfo.KeyIndex
-				}
-			}
-			if len(addrs) > 0 {
-				index++
-			}
-			fmt.Printf("No index specified; using lowest available index (%v)\n", index)
+			index, err := c.SeedIndex()
+			check(err, "Could not get next seed index")
+			fmt.Printf("No index specified; using lowest unused index (%v)\n", index)
 		} else {
 			index, err = strconv.ParseUint(args[0], 10, 32)
 			check(err, "Invalid index")
@@ -294,6 +268,7 @@ func main() {
 				check(err, "Could not get address info")
 				if addrInfo.KeyIndex == index {
 					fmt.Printf("WARNING: You have already generated an address with index %v.\n", index)
+					break
 				}
 			}
 		}
@@ -408,7 +383,8 @@ func main() {
 			} else {
 				var pubkey types.SiaPublicKey
 				fmt.Println("This transaction requires a 'change output' that will send excess coins back to your wallet.")
-				index := nextUnusedIndex(c)
+				index, err := c.SeedIndex()
+				check(err, "Could not get next seed index")
 				if *hot {
 					seed = getSeed()
 					pubkey = seed.PublicKey(index)
