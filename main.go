@@ -37,6 +37,7 @@ var (
     walrus-cli [flags] [action]
 
 Actions:
+    seed            generate a seed
     balance         view current balance
     addresses       list addresses
     addr            generate an address

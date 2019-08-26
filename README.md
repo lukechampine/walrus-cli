@@ -5,6 +5,7 @@ It makes it easy to check your balance, generate addresses, and sign and
 broadcast transactions using either a "cold" Ledger Nano S hardware wallet or a
 traditional "hot" wallet.
 
+
 ## Setup
 
 You will need a synchronized `walrus` server. You can specify the address of the
@@ -13,9 +14,10 @@ server with the `-a` flag.
 If you are using a Nano S, the [Sia app](https://github.com/LedgerHQ/nanos-app-sia) must be installed and open when
 `walrus-cli` commands are run.
 
-If you are using `walrus-cli` as a hot wallet, pass the `-hot` flag to all
-commands. Each command will prompt you to enter your seed. You can bypass these
-prompts by setting the `WALRUS_SEED` environment variable.
+If you want to use `walrus-cli` as a hot wallet, run `walrus-cli seed` to
+generate a new seed, and pass the `-hot` flag to all future commands. Each
+command will prompt you to enter your seed. You can bypass these prompts by
+setting the `WALRUS_SEED` environment variable.
 
 
 ## Generating an Address
