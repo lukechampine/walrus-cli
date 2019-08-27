@@ -257,7 +257,7 @@ func main() {
 		check(err, "Could not get address list")
 		var index uint64
 		if len(args) == 0 {
-			index, err := c.SeedIndex()
+			index, err = c.SeedIndex()
 			check(err, "Could not get next seed index")
 			fmt.Printf("No index specified; using lowest unused index (%v)\n", index)
 		} else {
