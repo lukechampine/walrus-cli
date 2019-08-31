@@ -22,15 +22,15 @@ setting the `WALRUS_SEED` environment variable.
 
 ## Generating an Address
 
-Run `walrus-cli addr` to generate a new address from your seed. The address will
-be added to the watch-only `walrus` server, so any coins you send to the address
-will appears as spendable outputs.
+Run `walrus-cli addr` to generate a new address and add it to your `walrus`
+server. By default, `addr` uses the seed index reported by the server's
+`/seedindex` endpoint. You can generate a specific address with `walrus-cli addr [index]`.
 
 
 ## Creating a Transaction
 
 Use the `walrus-cli txn` command to construct a transaction. Transactions are
-specified in comma-sparated address:amount pairs; for example, to send 100 SC to
+specified in comma-sparated address:amount pairs. For example, to send 100 SC to
 one address and 0.1 SC to another, you would write:
 
 ```
