@@ -254,9 +254,8 @@ func main() {
 			return
 		}
 		c := walrus.NewClient(*apiAddr)
-		addrs, err := c.Addresses()
-		check(err, "Could not get address list")
 		var index uint64
+		var err error
 		if len(args) == 0 {
 			index, err = c.SeedIndex()
 			check(err, "Could not get next seed index")
@@ -264,15 +263,6 @@ func main() {
 		} else {
 			index, err = strconv.ParseUint(args[0], 10, 32)
 			check(err, "Invalid index")
-			// check for duplicate
-			for _, addr := range addrs {
-				addrInfo, err := c.AddressInfo(addr)
-				check(err, "Could not get address info")
-				if addrInfo.KeyIndex == index {
-					fmt.Printf("WARNING: You have already generated an address with index %v.\n", index)
-					break
-				}
-			}
 		}
 		var pubkey types.SiaPublicKey
 		if *hot {
@@ -289,6 +279,16 @@ func main() {
 			fmt.Println("Compare the address displayed on your device to the address below:")
 			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
 		}
+
+		// check for duplicate
+		addrInfo, err := c.AddressInfo(wallet.StandardAddress(pubkey))
+		if err == nil && addrInfo.KeyIndex == index {
+			fmt.Println(`The server reported that it is already tracking this address. No further
+action is needed. Please be aware that reusing addresses can compromise
+your privacy.`)
+			break
+		}
+
 		fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
 		bufio.NewReader(os.Stdin).ReadLine()
 		err = c.AddAddress(wallet.SeedAddressInfo{
