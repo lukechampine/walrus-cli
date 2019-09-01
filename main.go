@@ -59,7 +59,7 @@ Generates a random seed.
 	addressesUsage = `Usage:
     walrus-cli addresses
 
-Lists addresses known to the wallet.
+Lists addresses tracked by the wallet.
 `
 	addrUsage = `Usage:
     walrus-cli addr
@@ -85,6 +85,11 @@ Signs the inputs of the provided transaction that the wallet controls.
     walrus-cli broadcast [txn]
 
 Broadcasts the provided transaction.
+`
+	transactionsUsage = `Usage:
+walrus-cli transactions
+
+Lists transactions relevant to the wallet.
 `
 )
 
@@ -188,6 +193,7 @@ func main() {
 	signCmd := flagg.New("sign", signUsage)
 	signCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction (if true, omit file)")
 	broadcastCmd := flagg.New("broadcast", broadcastUsage)
+	transactionsCmd := flagg.New("transactions", transactionsUsage)
 
 	cmd := flagg.Parse(flagg.Tree{
 		Cmd: rootCmd,
@@ -200,6 +206,7 @@ func main() {
 			{Cmd: txnCmd},
 			{Cmd: signCmd},
 			{Cmd: broadcastCmd},
+			{Cmd: transactionsCmd},
 		},
 	})
 	args := cmd.Args()
@@ -509,6 +516,34 @@ your privacy.`)
 		}
 		err := broadcastFlow(walrus.NewClient(*apiAddr), readTxn(args[0]))
 		check(err, "Could not broadcast transaction")
+
+	case transactionsCmd:
+		if len(args) != 0 {
+			cmd.Usage()
+			return
+		}
+		c := walrus.NewClient(*apiAddr)
+		txids, err := c.Transactions(-1)
+		check(err, "Could not get transactions")
+		if len(txids) == 0 {
+			fmt.Println("No transactions to display.")
+			return
+		}
+		txns := make([]walrus.ResponseTransactionsID, len(txids))
+		for i, txid := range txids {
+			txns[i], err = c.Transaction(txid)
+			check(err, "Could not get transaction")
+		}
+		fmt.Println("Transaction ID                                                      Height    Gain/Loss")
+		for i, txn := range txns {
+			var delta string
+			if txn.Outflow.IsZero() {
+				delta = "+" + currencyUnits(txn.Inflow)
+			} else {
+				delta = "-" + currencyUnits(txn.Outflow)
+			}
+			fmt.Printf("%v  %8v    %v\n", txids[i], txn.BlockHeight, delta)
+		}
 	}
 }
 
