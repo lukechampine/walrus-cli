@@ -179,7 +179,7 @@ func main() {
 
 	rootCmd := flagg.Root
 	apiAddr := rootCmd.String("a", "localhost:9380", "host:port that the walrus API is running on")
-	hot := rootCmd.Bool("hot", false, "use a 'hot' seed-based wallet")
+	ledger := rootCmd.Bool("ledger", false, "use a Ledger Nano S instead of a seed")
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
 	versionCmd := flagg.New("version", versionUsage)
 	seedCmd := flagg.New("seed", seedUsage)
@@ -272,18 +272,18 @@ func main() {
 			check(err, "Invalid index")
 		}
 		var pubkey types.SiaPublicKey
-		if *hot {
-			seed := getSeed()
-			pubkey = seed.PublicKey(index)
-			fmt.Println("Derived address from seed:")
-			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
-		} else {
+		if *ledger {
 			nanos, err := sialedger.OpenNanoS()
 			check(err, "Could not connect to Nano S")
 			fmt.Printf("Please verify and accept the prompt on your device to generate address #%v.\n", index)
 			_, pubkey, err = nanos.GetAddress(uint32(index), false)
 			check(err, "Could not generate address")
 			fmt.Println("Compare the address displayed on your device to the address below:")
+			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+		} else {
+			seed := getSeed()
+			pubkey = seed.PublicKey(index)
+			fmt.Println("Derived address from seed:")
 			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
 		}
 
@@ -394,12 +394,7 @@ your privacy.`)
 				fmt.Println("This transaction requires a 'change output' that will send excess coins back to your wallet.")
 				index, err := c.SeedIndex()
 				check(err, "Could not get next seed index")
-				if *hot {
-					seed = getSeed()
-					pubkey = seed.PublicKey(index)
-					fmt.Println("Derived address from seed:")
-					fmt.Println("    " + wallet.StandardAddress(pubkey).String())
-				} else {
+				if *ledger {
 					fmt.Println("Please verify and accept the prompt on your device to generate a change address.")
 					fmt.Println("(You may use the --change flag to specify a change address in advance.)")
 					nanos, err = sialedger.OpenNanoS()
@@ -407,6 +402,11 @@ your privacy.`)
 					_, pubkey, err = nanos.GetAddress(uint32(index), false)
 					check(err, "Could not generate address")
 					fmt.Println("Compare the address displayed on your device to the address below:")
+					fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+				} else {
+					seed = getSeed()
+					pubkey = seed.PublicKey(index)
+					fmt.Println("Derived address from seed:")
 					fmt.Println("    " + wallet.StandardAddress(pubkey).String())
 				}
 				fmt.Print("Press ENTER to add this address to your wallet, or Ctrl-C to cancel.")
@@ -449,18 +449,18 @@ your privacy.`)
 		fmt.Println()
 
 		if sign {
-			if *hot {
-				if seed == (wallet.Seed{}) {
-					seed = getSeed()
-				}
-				err := signFlowHot(c, seed, &txn)
-				check(err, "Could not sign transaction")
-			} else {
+			if *ledger {
 				if nanos == nil {
 					nanos, err = sialedger.OpenNanoS()
 					check(err, "Could not connect to Nano S")
 				}
 				err := signFlow(c, nanos, &txn)
+				check(err, "Could not sign transaction")
+			} else {
+				if seed == (wallet.Seed{}) {
+					seed = getSeed()
+				}
+				err := signFlowHot(c, seed, &txn)
 				check(err, "Could not sign transaction")
 			}
 		} else {
@@ -487,14 +487,14 @@ your privacy.`)
 		}
 		txn := readTxn(args[0])
 		c := walrus.NewClient(*apiAddr)
-		if *hot {
-			seed := getSeed()
-			err := signFlowHot(c, seed, &txn)
-			check(err, "Could not sign transaction")
-		} else {
+		if *ledger {
 			nanos, err := sialedger.OpenNanoS()
 			check(err, "Could not connect to Nano S")
 			err = signFlow(c, nanos, &txn)
+			check(err, "Could not sign transaction")
+		} else {
+			seed := getSeed()
+			err := signFlowHot(c, seed, &txn)
 			check(err, "Could not sign transaction")
 		}
 
