@@ -7,7 +7,7 @@ require (
 	gitlab.com/NebulousLabs/Sia v1.4.1
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	lukechampine.com/flagg v1.1.1
-	lukechampine.com/sialedger v0.0.0-20190804211231-0e9955f04f66
+	lukechampine.com/sialedger v1.0.0
 	lukechampine.com/us v0.11.1
 	lukechampine.com/walrus v0.6.0
 )
