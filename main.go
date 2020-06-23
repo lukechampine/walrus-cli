@@ -22,6 +22,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"lukechampine.com/flagg"
 	"lukechampine.com/sialedger"
+	"lukechampine.com/us/ed25519hash"
 	"lukechampine.com/us/wallet"
 	"lukechampine.com/walrus"
 )
@@ -640,7 +641,7 @@ func signFlowHot(c *walrus.Client, seed wallet.Seed, txn *types.Transaction) err
 
 	// sign each TransactionSignature
 	for sigIndex, keyIndex := range sigMap {
-		sig := seed.SecretKey(keyIndex).SignHash(txn.SigHash(sigIndex, types.ASICHardforkHeight+1))
+		sig := ed25519hash.Sign(seed.SecretKey(keyIndex), txn.SigHash(sigIndex, types.ASICHardforkHeight+1))
 		txn.TransactionSignatures[sigIndex].Signature = sig
 	}
 	return nil
