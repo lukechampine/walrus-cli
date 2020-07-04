@@ -45,6 +45,7 @@ Actions:
     txn             create a transaction
     sign            sign a transaction
     broadcast       broadcast a transaction
+    transactions    list transactions
 `
 	versionUsage = rootUsage
 	balanceUsage = `Usage:
