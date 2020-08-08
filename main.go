@@ -116,7 +116,8 @@ func plural(n int) string {
 
 func currencyUnits(c types.Currency) string {
 	r := new(big.Rat).SetFrac(c.Big(), types.SiacoinPrecision.Big())
-	return strings.TrimRight(r.FloatString(30), "0.") + "SC"
+	sc := strings.TrimRight(r.FloatString(30), "0")
+	return strings.TrimSuffix(sc, ".") + " SC"
 }
 
 func parseCurrency(s string) types.Currency {
