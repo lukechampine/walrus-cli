@@ -368,7 +368,7 @@ your privacy.`)
 		}
 
 		// fund transaction
-		utxos, err := c.UnspentOutputs(false)
+		utxos, err := c.UnspentOutputs(true)
 		check(err, "Could not get utxos")
 		inputs := make([]wallet.ValuedInput, len(utxos))
 		for i, o := range utxos {
@@ -463,7 +463,7 @@ your privacy.`)
 		}
 
 	case splitCmd:
-		if !((len(args) == 2) || (len(args) == 1 && broadcast)) {
+		if !((len(args) == 3) || (len(args) == 2 && broadcast)) {
 			cmd.Usage()
 			return
 		}
@@ -473,7 +473,7 @@ your privacy.`)
 		per := parseCurrency(args[1])
 
 		// fetch utxos and fee
-		utxos, err := c.UnspentOutputs(false)
+		utxos, err := c.UnspentOutputs(true)
 		check(err, "Could not get utxos")
 		feePerByte, err := c.RecommendedFee()
 		check(err, "Could not get recommended transaction fee")
@@ -546,11 +546,11 @@ your privacy.`)
 			return
 		}
 
-		writeTxn(args[1], txn)
+		writeTxn(args[2], txn)
 		if sign {
-			fmt.Println("Wrote signed transaction to", args[1])
+			fmt.Println("Wrote signed transaction to", args[2])
 		} else {
-			fmt.Println("Wrote unsigned transaction to", args[1])
+			fmt.Println("Wrote unsigned transaction to", args[2])
 		}
 
 	case signCmd:
