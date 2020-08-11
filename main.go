@@ -39,6 +39,7 @@ var (
 Actions:
     seed            generate a seed
     balance         view current balance
+    consensus       view blockchain information
     addresses       list addresses
     addr            generate an address
     txn             create a transaction
@@ -57,6 +58,11 @@ Reports the current balance.
     walrus-cli seed
 
 Generates a random seed.
+`
+	consensusUsage = `Usage:
+    walrus-cli consensus
+
+Reports the current block height and change ID.
 `
 	addressesUsage = `Usage:
     walrus-cli addresses
@@ -213,6 +219,7 @@ func main() {
 	versionCmd := flagg.New("version", versionUsage)
 	seedCmd := flagg.New("seed", seedUsage)
 	balanceCmd := flagg.New("balance", balanceUsage)
+	consensusCmd := flagg.New("consensus", consensusUsage)
 	addressesCmd := flagg.New("addresses", addressesUsage)
 	addrCmd := flagg.New("addr", addrUsage)
 	txnCmd := flagg.New("txn", txnUsage)
@@ -233,6 +240,7 @@ func main() {
 		Sub: []flagg.Tree{
 			{Cmd: versionCmd},
 			{Cmd: seedCmd},
+			{Cmd: consensusCmd},
 			{Cmd: balanceCmd},
 			{Cmd: addressesCmd},
 			{Cmd: addrCmd},
@@ -264,6 +272,15 @@ func main() {
 			return
 		}
 		fmt.Println(wallet.NewSeed())
+
+	case consensusCmd:
+		if len(args) != 0 {
+			cmd.Usage()
+			return
+		}
+		info, err := c.ConsensusInfo()
+		check(err, "Could not get consensus info")
+		fmt.Printf("Height:    %v\nChange ID: %v\n", info.Height, info.CCID)
 
 	case balanceCmd:
 		if len(args) != 0 {
