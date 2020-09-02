@@ -213,7 +213,7 @@ func main() {
 	var changeAddrStr string // used by the txn and split commands
 
 	rootCmd := flagg.Root
-	apiAddr := rootCmd.String("a", "localhost:9380", "host:port that the walrus API is running on")
+	apiAddr := rootCmd.String("a", "http://localhost:9380", "host:port that the walrus API is running on")
 	ledger := rootCmd.Bool("ledger", false, "use a Ledger Nano S instead of a seed")
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
 	versionCmd := flagg.New("version", versionUsage)
