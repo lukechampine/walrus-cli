@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -44,6 +45,7 @@ Actions:
     addr            generate an address
     txn             create a transaction
     split           create an output-splitting transaction
+    defrag          create an output-merging transaction
     sign            sign a transaction
     broadcast       broadcast a transaction
     transactions    list transactions
@@ -89,6 +91,13 @@ walrus-cli split [n] [value] [file]
 Creates a transaction that splits the wallet's existing inputs into n outputs,
 each with the specified value. The inputs are selected automatically, and a
 change address is generated if needed.
+`
+	defragUsage = `Usage:
+walrus-cli defrag [value] [file]
+
+Creates a transaction that merges inputs worth less than value into one output.
+To avoid exceeding the maximum transaction size, at most 100 inputs will be
+selected, so it may be necessary to run this command multiple times.
 `
 	signUsage = `Usage:
     walrus-cli sign [txn]
@@ -230,6 +239,10 @@ func main() {
 	splitCmd.BoolVar(&sign, "sign", false, "sign the transaction")
 	splitCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction")
 	splitCmd.StringVar(&changeAddrStr, "change", "", "use this change address instead of generating a new one")
+	defragCmd := flagg.New("defrag", splitUsage)
+	defragCmd.BoolVar(&sign, "sign", false, "sign the transaction")
+	defragCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction")
+	defragCmd.StringVar(&changeAddrStr, "change", "", "use this change address instead of generating a new one")
 	signCmd := flagg.New("sign", signUsage)
 	signCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction (if true, omit file)")
 	broadcastCmd := flagg.New("broadcast", broadcastUsage)
@@ -246,6 +259,7 @@ func main() {
 			{Cmd: addrCmd},
 			{Cmd: txnCmd},
 			{Cmd: splitCmd},
+			{Cmd: defragCmd},
 			{Cmd: signCmd},
 			{Cmd: broadcastCmd},
 			{Cmd: transactionsCmd},
@@ -569,6 +583,101 @@ your privacy.`)
 			fmt.Println("Wrote signed transaction to", args[2])
 		} else {
 			fmt.Println("Wrote unsigned transaction to", args[2])
+		}
+
+	case defragCmd:
+		if !((len(args) == 2) || (len(args) == 1 && broadcast)) {
+			cmd.Usage()
+			return
+		}
+		// parse
+		min := parseCurrency(args[0])
+
+		// fetch utxos and fee
+		utxos, err := c.UnspentOutputs(true)
+		check(err, "Could not get utxos")
+		feePerByte, err := c.RecommendedFee()
+		check(err, "Could not get recommended transaction fee")
+
+		// sort by value (descending)
+		sort.Slice(utxos, func(i, j int) bool {
+			return utxos[i].Value.Cmp(utxos[j].Value) > 0
+		})
+
+		var ins []wallet.UnspentOutput
+		for i, u := range utxos {
+			if u.Value.Cmp(min) < 0 {
+				ins = utxos[i:]
+				break
+			}
+		}
+		if len(ins) > 100 {
+			// use the 100 most valuable
+			ins = ins[:100]
+		}
+		total := wallet.SumOutputs(ins)
+
+		// get change output
+		var changeAddr types.UnlockHash
+		if changeAddrStr != "" {
+			err = changeAddr.LoadString(changeAddrStr)
+			check(err, "Could not parse change address")
+		} else {
+			changeAddr = getChangeFlow(c, *ledger)
+		}
+
+		// create txn
+		txn := types.Transaction{
+			SiacoinInputs: make([]types.SiacoinInput, len(ins)),
+			SiacoinOutputs: []types.SiacoinOutput{{
+				UnlockHash: changeAddr,
+				Value:      types.SiacoinPrecision, // placeholder, for fee calculation
+			}},
+			MinerFees: []types.Currency{types.SiacoinPrecision}, // placeholder, for fee calculation
+		}
+		for i, o := range ins {
+			info, err := c.AddressInfo(o.UnlockHash)
+			check(err, "Could not get address info")
+			txn.SiacoinInputs[i] = types.SiacoinInput{
+				ParentID:         o.ID,
+				UnlockConditions: info.UnlockConditions,
+			}
+		}
+		txn.MinerFees[0] = feePerByte.Mul64(uint64(txn.MarshalSiaSize()))
+		if txn.MinerFees[0].Cmp(total) >= 0 {
+			check(errors.New("miner fee exceeds value of inputs"), "Could not create defrag transaction")
+		}
+		txn.SiacoinOutputs[0].Value = total.Sub(txn.MinerFees[0])
+
+		fmt.Println("Transaction summary:")
+		fmt.Printf("- %v input%v, totalling %v\n", len(ins), plural(len(ins)), currencyUnits(total))
+		fmt.Printf("- 1 change output, totalling %v\n", currencyUnits(txn.SiacoinOutputs[0].Value))
+		fmt.Printf("- A miner fee of %v, which is %v/byte\n", currencyUnits(txn.MinerFees[0]), currencyUnits(feePerByte))
+		fmt.Println()
+
+		if sign {
+			if *ledger {
+				err := signFlowCold(c, &txn)
+				check(err, "Could not sign transaction")
+			} else {
+				err := signFlowHot(c, &txn)
+				check(err, "Could not sign transaction")
+			}
+		} else {
+			fmt.Println("Transaction has not been signed. You can sign it with the 'sign' command.")
+		}
+
+		if broadcast {
+			err := broadcastFlow(c, txn)
+			check(err, "Could not broadcast transaction")
+			return
+		}
+
+		writeTxn(args[1], txn)
+		if sign {
+			fmt.Println("Wrote signed transaction to", args[1])
+		} else {
+			fmt.Println("Wrote unsigned transaction to", args[1])
 		}
 
 	case signCmd:
