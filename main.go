@@ -733,10 +733,10 @@ your privacy.`)
 		fmt.Println("Transaction ID                                                      Height    Gain/Loss")
 		for i, txn := range txns {
 			var delta string
-			if txn.Outflow.IsZero() {
-				delta = "+" + currencyUnits(txn.Inflow)
+			if txn.Debit.IsZero() {
+				delta = "+" + currencyUnits(txn.Credit)
 			} else {
-				delta = "-" + currencyUnits(txn.Outflow)
+				delta = "-" + currencyUnits(txn.Debit)
 			}
 			fmt.Printf("%v  %8v    %v\n", txids[i], txn.BlockHeight, delta)
 		}
