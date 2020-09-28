@@ -239,7 +239,7 @@ func main() {
 	splitCmd.BoolVar(&sign, "sign", false, "sign the transaction")
 	splitCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction")
 	splitCmd.StringVar(&changeAddrStr, "change", "", "use this change address instead of generating a new one")
-	defragCmd := flagg.New("defrag", splitUsage)
+	defragCmd := flagg.New("defrag", defragUsage)
 	defragCmd.BoolVar(&sign, "sign", false, "sign the transaction")
 	defragCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction")
 	defragCmd.StringVar(&changeAddrStr, "change", "", "use this change address instead of generating a new one")
