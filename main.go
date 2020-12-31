@@ -220,6 +220,7 @@ func main() {
 	log.SetFlags(0)
 	var sign, broadcast bool // used by txn and sign commands
 	var changeAddrStr string // used by the txn and split commands
+	var showPubkey bool      // used by the addr command
 
 	rootCmd := flagg.Root
 	apiAddr := rootCmd.String("a", "http://localhost:9380", "host:port that the walrus API is running on")
@@ -231,6 +232,7 @@ func main() {
 	consensusCmd := flagg.New("consensus", consensusUsage)
 	addressesCmd := flagg.New("addresses", addressesUsage)
 	addrCmd := flagg.New("addr", addrUsage)
+	addrCmd.BoolVar(&showPubkey, "pubkey", false, "also display the address's public key")
 	txnCmd := flagg.New("txn", txnUsage)
 	txnCmd.BoolVar(&sign, "sign", false, "sign the transaction")
 	txnCmd.BoolVar(&broadcast, "broadcast", false, "broadcast the transaction")
@@ -348,6 +350,10 @@ func main() {
 			pubkey = seed.PublicKey(index)
 			fmt.Println("Derived address from seed:")
 			fmt.Println("    " + wallet.StandardAddress(pubkey).String())
+		}
+		if showPubkey {
+			fmt.Println("The pubkey for this address is:")
+			fmt.Println("    " + pubkey.String())
 		}
 
 		// check for duplicate
